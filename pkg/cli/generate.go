@@ -45,6 +45,7 @@ type GenerateArgs struct {
 	JobTimeoutSeconds         int
 	JunitResultsFile          string
 	ImageRegistry             string
+	TestCaseNumbers           []int
 	//BatchJobs                 bool
 }
 
@@ -87,6 +88,7 @@ func SetupGenerateCommand() *cobra.Command {
 
 	command.Flags().StringVar(&args.JunitResultsFile, "junit-results-file", "", "output junit results to the specified file")
 	command.Flags().StringVar(&args.ImageRegistry, "image-registry", "registry.k8s.io", "Image registry for agnhost")
+	command.Flags().IntSliceVar(&args.TestCaseNumbers, "test-case-numbers", []int{}, "test numbers to run")
 
 	return command
 }
@@ -164,18 +166,34 @@ func RunGenerateCommand(args *GenerateArgs) {
 		}
 	}
 
-	for i, testCase := range testCases {
-		fmt.Printf("starting test case #%d\n", i+1)
+	/*
+		pass test case number like --test-case-numbers=9,10
+	*/
+	if len(args.TestCaseNumbers) != 0 {
+		tcNumbers := args.TestCaseNumbers
+		for _, num := range tcNumbers {
+			fmt.Printf("starting test case #%d\n", num)
 
-		result := interpreter.ExecuteTestCase(testCase)
-		utils.DoOrDie(result.Err)
+			result := interpreter.ExecuteTestCase(testCases[num-1])
+			utils.DoOrDie(result.Err)
 
-		printer.PrintTestCaseResult(result)
-		fmt.Printf("finished policy #%d\n", i+1)
+			printer.PrintTestCaseResult(result)
+			fmt.Printf("finished policy #%d\n", num)
+		}
+	} else {
+		for i, testCase := range testCases {
+			fmt.Printf("starting test case #%d\n", i+1)
 
-		if args.FailFast && !result.Passed(interpreter.Config.IgnoreLoopback) {
-			logrus.Warn("failing fast due to failure")
-			break
+			result := interpreter.ExecuteTestCase(testCase)
+			utils.DoOrDie(result.Err)
+
+			printer.PrintTestCaseResult(result)
+			fmt.Printf("finished policy #%d\n", i+1)
+
+			if args.FailFast && !result.Passed(interpreter.Config.IgnoreLoopback) {
+				logrus.Warn("failing fast due to failure")
+				break
+			}
 		}
 	}
 
